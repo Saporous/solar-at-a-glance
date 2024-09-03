@@ -1,17 +1,15 @@
-#define _ETHERNET_WEBSERVER_LOGLEVEL_ 1
-#define _ASYNC_MQTT_LOGLEVEL_ 1
-#include <WebServer_WT32_ETH01.h>
+#include "secrets.h"
+
+#include <WiFi.h>
 
 extern "C"
 {
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
 }
-
 #include <AsyncMQTT_ESP32.h>
 #include <FastLED.h>
 
-//#define MQTT_HOST         IPAddress(192, 168, 2, 110)
 #define MQTT_HOST         "192.168.1.112"        // Broker address
 #define MQTT_PORT         1883
 
@@ -19,6 +17,7 @@ const char *PubTopic  = "solar_assistant/total/battery_state_of_charge/state";  
 
 AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
+TimerHandle_t wifiReconnectTimer;
 
 bool messageReceived;
 int payloadValue;
@@ -26,7 +25,7 @@ int lastMillis, currentMillis;
 
 FASTLED_USING_NAMESPACE
 
-#define DATA_PIN    4
+#define DATA_PIN    2
 #define LED_TYPE    WS2812B
 #define COLOR_ORDER GRB
 #define NUM_LEDS    11
@@ -34,6 +33,11 @@ CRGB leds[NUM_LEDS];
 
 #define BRIGHTNESS          2
 #define FRAMES_PER_SECOND  30
+void connectToWifi()
+{
+  Serial.println("Connecting to Wi-Fi...");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+}
 
 void connectToMqtt()
 {
@@ -41,62 +45,54 @@ void connectToMqtt()
   mqttClient.connect();
 }
 
-void ETH_event(WiFiEvent_t event)
+void WiFiEvent(WiFiEvent_t event)
 {
   switch (event)
   {
 #if USING_CORE_ESP32_CORE_V200_PLUS
 
-    case ARDUINO_EVENT_ETH_START:
-      Serial.println("ETH starting");
+    case ARDUINO_EVENT_WIFI_READY:
+      Serial.println("WiFi ready");
       break;
 
-    case ARDUINO_EVENT_ETH_CONNECTED:
-      Serial.println("ETH connected");
+    case ARDUINO_EVENT_WIFI_STA_START:
+      Serial.println("WiFi STA starting");
       break;
 
-    case ARDUINO_EVENT_ETH_GOT_IP:
-      Serial.println("ETH got IP");
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      Serial.println("WiFi STA connected");
+      break;
+
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP6:
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+      Serial.println("WiFi connected");
       Serial.print("IP address: ");
-      Serial.println(ETH.localIP());
+      Serial.println(WiFi.localIP());
       connectToMqtt();
       break;
 
-    case ARDUINO_EVENT_ETH_DISCONNECTED:
-      Serial.println("ETH lost connection");
-
-      // ensure we don't reconnect to MQTT when no ETH
-      xTimerStop(mqttReconnectTimer, 0);
-
+    case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+      Serial.println("WiFi lost IP");
       break;
 
-    case ARDUINO_EVENT_ETH_STOP:
-      Serial.println("ETH stops");
-
-      // ensure we don't reconnect to MQTT when no ETH
-      xTimerStop(mqttReconnectTimer, 0);
-
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      Serial.println("WiFi lost connection");
+      xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+      xTimerStart(wifiReconnectTimer, 0);
       break;
 #else
 
-    case SYSTEM_EVENT_ETH_CONNECTED:
-      erial.println(F("ETH Connected"));
-      break;
-
-    case SYSTEM_EVENT_ETH_GOT_IP:
-      Serial.println("ETH connected");
+    case SYSTEM_EVENT_STA_GOT_IP:
+      Serial.println("WiFi connected");
       Serial.println("IP address: ");
-      Serial.println(ETH.localIP());
+      Serial.println(WiFi.localIP());
       connectToMqtt();
       break;
 
-    case SYSTEM_EVENT_ETH_DISCONNECTED:
-    case SYSTEM_EVENT_ETH_STOP:
-      Serial.println("ETH lost connection");
-
-      // ensure we don't reconnect to MQTT when no ETH
-      xTimerStop(mqttReconnectTimer, 0);
-
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+      Serial.println("WiFi lost connection");
+      xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
+      xTimerStart(wifiReconnectTimer, 0);
       break;
 #endif
 
@@ -127,6 +123,9 @@ void onMqttConnect(bool sessionPresent)
   Serial.print("Subscribing at QoS 2, packetId: ");
   Serial.println(packetIdSub);
 
+  mqttClient.publish(PubTopic, 0, true, "ESP32 Test");
+  Serial.println("Publishing at QoS 0");
+
   printSeparationLine();
 }
 
@@ -136,7 +135,7 @@ void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
 
   Serial.println("Disconnected from MQTT.");
 
-  if (WT32_ETH01_isConnected())
+  if (WiFi.isConnected())
   {
     xTimerStart(mqttReconnectTimer, 0);
   }
@@ -194,32 +193,37 @@ void onMqttPublish(const uint16_t& packetId)
   Serial.println(packetId);
 }
 
-void setup() {
+void setup()
+{
   Serial.begin(115200);
-  Serial.println("Setup begin");
 
   while (!Serial && millis() < 5000);
 
-  Serial.print("\nStarting FullyFeature_WT32_ETH01 on ");
-  Serial.print(ARDUINO_BOARD);
-  Serial.println(" with " + String(SHIELD_TYPE));
-  Serial.println(WEBSERVER_WT32_ETH01_VERSION);
+  delay(500);
+
+  Serial.print("\nStarting FullyFeature_ESP32 on ");
+  Serial.println(ARDUINO_BOARD);
   Serial.println(ASYNC_MQTT_ESP32_VERSION);
 
   mqttReconnectTimer = xTimerCreate("mqttTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0,
                                     reinterpret_cast<TimerCallbackFunction_t>(connectToMqtt));
+  wifiReconnectTimer = xTimerCreate("wifiTimer", pdMS_TO_TICKS(2000), pdFALSE, (void*)0,
+                                    reinterpret_cast<TimerCallbackFunction_t>(connectToWifi));
+
+  WiFi.onEvent(WiFiEvent);
+
   mqttClient.onConnect(onMqttConnect);
   mqttClient.onDisconnect(onMqttDisconnect);
   mqttClient.onSubscribe(onMqttSubscribe);
   mqttClient.onUnsubscribe(onMqttUnsubscribe);
   mqttClient.onMessage(onMqttMessage);
   mqttClient.onPublish(onMqttPublish);
-  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
-  WiFi.onEvent(ETH_event);
-  ETH.begin(ETH_PHY_ADDR, ETH_PHY_POWER);
-  WT32_ETH01_waitForConnect();
-  FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
 
+  mqttClient.setServer(MQTT_HOST, MQTT_PORT);
+
+  connectToWifi();
+
+  FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
   leds[0] = CRGB::Red;
   leds[1] = CRGB::Green;
@@ -234,9 +238,14 @@ void loop()
   currentMillis = millis();
   if (currentMillis - lastMillis > 1000){ 
     lastMillis = currentMillis;
+    // reset LEDs by setting them to black (off)
+    for (int i = 0; i < NUM_LEDS; i++){ 
+      leds[i] = CRGB::Black;
+    }
+    
     for (int i = 0; i < NUM_LEDS; i++){ 
       if (payloadValue / 10 > i) leds[i] = CRGB::Red;
     }
-      FastLED.show(); 
+    FastLED.show(); 
   }
 }
