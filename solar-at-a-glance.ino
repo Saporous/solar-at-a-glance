@@ -15,6 +15,26 @@ extern "C"
 
 const char *PubTopic  = "solar_assistant/total/battery_state_of_charge/state";               // Topic to publish
 
+class MQTT_data {
+  int id;
+  char *topic;
+  int max_value;
+  public:
+  MQTT_data(int i, char *top, int max) {
+    id = i;
+    topic = top;
+    max_value = max;
+  }
+};
+
+MQTT_data data[4] = {
+  MQTT_data(0, "solar_assistant/total/battery_state_of_charge/state", 100),
+  MQTT_data(0, "solar_assistant/total/battery_state_of_charge/state", 100),
+  MQTT_data(0, "solar_assistant/total/battery_state_of_charge/state", 100),
+  MQTT_data(0, "solar_assistant/total/battery_state_of_charge/state", 100)
+};
+
+
 AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
 TimerHandle_t wifiReconnectTimer;
