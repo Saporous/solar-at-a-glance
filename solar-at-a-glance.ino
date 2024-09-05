@@ -33,6 +33,10 @@ CRGB leds[NUM_LEDS];
 
 #define BRIGHTNESS          2
 #define FRAMES_PER_SECOND  30
+
+#define PIR_PIN     17
+#define USE_PIR
+
 void connectToWifi()
 {
   Serial.println("Connecting to Wi-Fi...");
@@ -193,6 +197,13 @@ void onMqttPublish(const uint16_t& packetId)
   Serial.println(packetId);
 }
 
+bool checkPIR() {
+  #ifdef USE_PIR 
+  return digitalRead(PIR_PIN);
+  #endif
+  return true;
+}
+
 void setup()
 {
   Serial.begin(115200);
@@ -230,21 +241,24 @@ void setup()
   leds[2] = CRGB::Blue;
   leds[3] = CRGB::Red;
   FastLED.show();  
+
+  pinMode(PIR_PIN, INPUT);
   Serial.println("\nSetup end");
 }
   
 void loop()
 {
   currentMillis = millis();
-  if (currentMillis - lastMillis > 1000){ 
-    lastMillis = currentMillis;
-    // reset LEDs by setting them to black (off)
+  if (currentMillis - lastMillis > 1000){
     for (int i = 0; i < NUM_LEDS; i++){ 
       leds[i] = CRGB::Black;
     }
-    
-    for (int i = 0; i < NUM_LEDS; i++){ 
-      if (payloadValue / 10 > i) leds[i] = CRGB::Red;
+    if (checkPIR()) { 
+      lastMillis = currentMillis;
+      // reset LEDs by setting them to black (off)
+      for (int i = 0; i < NUM_LEDS; i++){ 
+        if (payloadValue / 10 > i) leds[i] = CRGB::Red;
+      }
     }
     FastLED.show(); 
   }
