@@ -16,22 +16,25 @@ extern "C"
 const char *PubTopic  = "solar_assistant/total/battery_state_of_charge/state";               // Topic to publish
 
 class MQTT_data {
-  int id;
+  char *name;
   char *topic;
   int max_value;
+  CRGB color;
   public:
-  MQTT_data(int i, char *top, int max) {
-    id = i;
+  int current_value;
+  MQTT_data(char *top, int max, char *n, CRGB c, int current_value = 0) {
     topic = top;
     max_value = max;
+    name = n;
+    color = c;
   }
 };
 
 MQTT_data data[4] = {
-  MQTT_data(0, "solar_assistant/total/battery_state_of_charge/state", 100),
-  MQTT_data(0, "solar_assistant/total/battery_state_of_charge/state", 100),
-  MQTT_data(0, "solar_assistant/total/battery_state_of_charge/state", 100),
-  MQTT_data(0, "solar_assistant/total/battery_state_of_charge/state", 100)
+  MQTT_data("solar_assistant/total/battery_state_of_charge/state", 100, "Battery %", CRGB::Green),
+  MQTT_data("solar_assistant/total/pv_power/state", 6000, "Solar %", CRGB::Yellow),
+  MQTT_data("solar_assistant/total/load_percentage/state", 100, "Load %", CRGB::Blue),
+  MQTT_data("solar_assistant/total/grid_power/state", 2000, "Grid %", CRGB::Red)
 };
 
 
@@ -39,7 +42,6 @@ AsyncMqttClient mqttClient;
 TimerHandle_t mqttReconnectTimer;
 TimerHandle_t wifiReconnectTimer;
 
-bool messageReceived;
 int payloadValue;
 int lastMillis, currentMillis;
 
@@ -140,6 +142,7 @@ void onMqttConnect(bool sessionPresent)
   Serial.println(sessionPresent);
 
   uint16_t packetIdSub = mqttClient.subscribe(PubTopic, 2);
+  for (int i = 0; i < )
   Serial.print("Subscribing at QoS 2, packetId: ");
   Serial.println(packetIdSub);
 
@@ -182,7 +185,6 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
 {
   (void) payload;
   payloadValue = 0;
-  messageReceived = 1;
   Serial.println("Publish received.");
   Serial.print("  topic: ");
   Serial.println(topic);
