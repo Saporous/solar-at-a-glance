@@ -55,10 +55,10 @@ class MQTT_data {
 
 int NUMBER_OF_STATISTICS = 4;
 MQTT_data data[4] = {
-  MQTT_data("solar_assistant/total/battery_state_of_charge/state", 100, "Battery %", CRGB::Green),
-  MQTT_data("solar_assistant/total/pv_power/state", 6000, "Solar %", CRGB::Yellow),
-  MQTT_data("solar_assistant/total/load_percentage/state", 100, "Load %", CRGB::Blue),
-  MQTT_data("solar_assistant/total/grid_power/state", 2000, "Grid %", CRGB::Red)
+  MQTT_data("solar_assistant/total/battery_state_of_charge/state", "Battery %", CRGB::Green, 100),
+  MQTT_data("solar_assistant/total/pv_power/state", "Solar %", CRGB::Yellow, 6000),
+  MQTT_data("solar_assistant/total/load_percentage/state", "Load %", CRGB::Blue, 100),
+  MQTT_data("solar_assistant/total/grid_power/state", "Grid %", CRGB::Red, 2000)
 };
 
 
