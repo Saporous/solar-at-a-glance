@@ -20,16 +20,40 @@ class MQTT_data {
   char *topic;
   int max_value;
   CRGB color;
-  public:
   int current_value;
-  MQTT_data(char *top, int max, char *n, CRGB c, int current_value = 0) {
+  public:
+  MQTT_data(char *top, char *n, CRGB c, int mv, int cv = 0) {
     topic = top;
-    max_value = max;
     name = n;
     color = c;
+    max_value = mv;
+    current_value = cv;
+  };
+
+  char* get_topic() {
+    return topic;
+  }
+  char* get_name() {
+    return name;
+  }
+  int get_value() {
+    return current_value;
+  }
+  void set_value(int v) {
+    current_value = v;
+  }
+  int get_max_value() {
+    return max_value;
+  }
+  int get_percentage() {
+    return current_value * 100 / max_value;
+  }
+  CRGB get_color() {
+    return color;
   }
 };
 
+int NUMBER_OF_STATISTICS = 4;
 MQTT_data data[4] = {
   MQTT_data("solar_assistant/total/battery_state_of_charge/state", 100, "Battery %", CRGB::Green),
   MQTT_data("solar_assistant/total/pv_power/state", 6000, "Solar %", CRGB::Yellow),
@@ -134,22 +158,21 @@ void onMqttConnect(bool sessionPresent)
   Serial.print(MQTT_HOST);
   Serial.print(", port: ");
   Serial.println(MQTT_PORT);
-  Serial.print("PubTopic: ");
-  Serial.println(PubTopic);
-
   printSeparationLine();
   Serial.print("Session present: ");
   Serial.println(sessionPresent);
 
-  uint16_t packetIdSub = mqttClient.subscribe(PubTopic, 2);
-  for (int i = 0; i < )
-  Serial.print("Subscribing at QoS 2, packetId: ");
-  Serial.println(packetIdSub);
-
-  mqttClient.publish(PubTopic, 0, true, "ESP32 Test");
-  Serial.println("Publishing at QoS 0");
-
-  printSeparationLine();
+  // uint16_t packetIdSub = mqttClient.subscribe(PubTopic, 2);
+  for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
+    Serial.print("PubTopic: ");
+    Serial.println(PubTopic);
+    uint16_t packetIdSub = mqttClient.subscribe(data[i].get_topic(), 2);
+    Serial.print("Subscribing at QoS 2, packetId: ");
+    Serial.println(packetIdSub);
+    mqttClient.publish(PubTopic, 0, true, "ESP32 Test");
+    Serial.println("Publishing at QoS 0");
+    printSeparationLine();
+  }
 }
 
 void onMqttDisconnect(AsyncMqttClientDisconnectReason reason)
@@ -184,16 +207,14 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
                    const size_t& len, const size_t& index, const size_t& total)
 {
   (void) payload;
+  int id;
+  for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
+    if (topic == data[i].get_topic()) id = i;
+  }
   payloadValue = 0;
   Serial.println("Publish received.");
   Serial.print("  topic: ");
   Serial.println(topic);
-  Serial.print("  qos: ");
-  Serial.println(properties.qos);
-  Serial.print("  dup: ");
-  Serial.println(properties.dup);
-  Serial.print("  retain: ");
-  Serial.println(properties.retain);
   Serial.print("  len: ");
   Serial.println(len);
   Serial.print("  index: ");
@@ -205,7 +226,12 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
     // Serial.println("Payload value [" + String(i) + "]= " + String(payloadValue));
     if(i < len - 1) payloadValue *= 10;
   }
-  Serial.println(payloadValue);
+  Serial.print("Payload: ");
+  Serial.print(payloadValue);
+  Serial.print(" / ");
+  Serial.println(data[id].get_max_value());
+  data[id].set_value(payloadValue);
+  
 }
 
 void onMqttPublish(const uint16_t& packetId)
@@ -255,18 +281,26 @@ void setup()
   Serial.println("\nSetup end");
 }
   
-void loop()
-{
+void loop() {
   currentMillis = millis();
-  if (currentMillis - lastMillis > 1000){ 
+  if (currentMillis - lastMillis > 5000){ 
     lastMillis = currentMillis;
     // reset LEDs by setting them to black (off)
-    for (int i = 0; i < NUM_LEDS; i++){ 
+    for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = CRGB::Black;
     }
-    
-    for (int i = 0; i < NUM_LEDS; i++){ 
-      if (payloadValue / 10 > i) leds[i] = CRGB::Red;
+    for (int iter = 0; iter < NUMBER_OF_STATISTICS; iter++) {
+      for (int i = 0; i < NUM_LEDS; i++) {
+        if (data[iter].get_percentage() / 10 / NUM_LEDS > i) {
+          leds[i] = data[iter].get_color();
+          Serial.print("1");
+        }
+        Serial.print("0");
+      }
+      Serial.println("------");
+      Serial.print(data[iter].get_name());
+      Serial.println(data[iter].get_percentage());
+      Serial.println("------");
     }
     FastLED.show(); 
   }
