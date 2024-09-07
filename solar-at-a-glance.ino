@@ -249,15 +249,16 @@ void setup()
 void loop()
 {
   currentMillis = millis();
-  if (currentMillis - lastMillis > 1000){
-    for (int i = 0; i < NUM_LEDS; i++){ 
-      leds[i] = CRGB::Black;
-    }
+  if (currentMillis - lastMillis > 100){
+    lastMillis = currentMillis;
     if (checkPIR()) { 
-      lastMillis = currentMillis;
-      // reset LEDs by setting them to black (off)
       for (int i = 0; i < NUM_LEDS; i++){ 
-        if (payloadValue / 10 > i) leds[i] = CRGB::Red;
+        leds[i] = CRGB::Red;
+      }
+    }
+    else {
+      for (int i = 0; i < NUM_LEDS; i++){ 
+        leds[i] = CRGB::Black;
       }
     }
     FastLED.show(); 
