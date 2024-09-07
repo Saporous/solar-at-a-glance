@@ -45,11 +45,21 @@ class MQTT_data {
   int get_max_value() {
     return max_value;
   }
-  int get_percentage() {
-    return current_value * 100 / max_value;
+  double get_percentage() {
+    return current_value * 1.0 / max_value;
   }
   CRGB get_color() {
     return color;
+  }
+  void print_all() {
+    Serial.print(topic);
+    Serial.print(", ");
+    Serial.print(name);
+    Serial.print(", ");
+    Serial.print(max_value);
+    Serial.print(", ");
+    Serial.println(current_value);
+    return;
   }
 };
 
@@ -161,16 +171,14 @@ void onMqttConnect(bool sessionPresent)
   printSeparationLine();
   Serial.print("Session present: ");
   Serial.println(sessionPresent);
+  uint16_t packetIdSub;
 
   // uint16_t packetIdSub = mqttClient.subscribe(PubTopic, 2);
   for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
-    Serial.print("PubTopic: ");
-    Serial.println(PubTopic);
-    uint16_t packetIdSub = mqttClient.subscribe(data[i].get_topic(), 2);
+    data[i].print_all();
+    packetIdSub = mqttClient.subscribe(data[i].get_topic(), 2);
     Serial.print("Subscribing at QoS 2, packetId: ");
     Serial.println(packetIdSub);
-    mqttClient.publish(PubTopic, 0, true, "ESP32 Test");
-    Serial.println("Publishing at QoS 0");
     printSeparationLine();
   }
 }
@@ -207,10 +215,6 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
                    const size_t& len, const size_t& index, const size_t& total)
 {
   (void) payload;
-  int id;
-  for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
-    if (topic == data[i].get_topic()) id = i;
-  }
   payloadValue = 0;
   Serial.println("Publish received.");
   Serial.print("  topic: ");
@@ -221,6 +225,16 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
   Serial.println(index);
   Serial.print("  total: ");
   Serial.println(total);
+  int id;
+  for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
+    if (String(topic) == String(data[i].get_topic())) {
+      id = i;
+      Serial.print("Found: ");
+      data[i].print_all();
+      Serial.println();
+    }
+  }
+
   for (int i = 0; i < len; ++i) {
     payloadValue += payload[i]-48;
     // Serial.println("Payload value [" + String(i) + "]= " + String(payloadValue));
@@ -280,28 +294,33 @@ void setup()
   FastLED.show();  
   Serial.println("\nSetup end");
 }
-  
+
+int currentStatistic = 0;
 void loop() {
   currentMillis = millis();
-  if (currentMillis - lastMillis > 5000){ 
+  if (currentMillis - lastMillis > 2000) {
     lastMillis = currentMillis;
+    
+    currentStatistic++;
+    if (currentStatistic >= NUMBER_OF_STATISTICS) currentStatistic = 0;
+    
     // reset LEDs by setting them to black (off)
     for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = CRGB::Black;
     }
-    for (int iter = 0; iter < NUMBER_OF_STATISTICS; iter++) {
-      for (int i = 0; i < NUM_LEDS; i++) {
-        if (data[iter].get_percentage() / 10 / NUM_LEDS > i) {
-          leds[i] = data[iter].get_color();
-          Serial.print("1");
-        }
-        Serial.print("0");
+    data[currentStatistic].print_all();
+    for (int i = 0; i < NUM_LEDS; i++) {
+      if (data[currentStatistic].get_percentage() * NUM_LEDS > i) {
+        leds[i] = data[currentStatistic].get_color();
+        Serial.print("1");
       }
-      Serial.println("------");
-      Serial.print(data[iter].get_name());
-      Serial.println(data[iter].get_percentage());
-      Serial.println("------");
+      Serial.print("0");
     }
+    Serial.println("------");
+    Serial.print(data[currentStatistic].get_name());
+    Serial.println(data[currentStatistic].get_percentage());
+    Serial.println("------");
+
     FastLED.show(); 
   }
 }
