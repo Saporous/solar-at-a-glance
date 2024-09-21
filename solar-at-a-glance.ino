@@ -252,11 +252,11 @@ void setup()
   connectToWifi();
 
   FastLED.addLeds<LED_TYPE,2,COLOR_ORDER>(leds[0], NUM_LEDS).setCorrection(TypicalLEDStrip);
-  FastLED.addLeds<LED_TYPE,14,COLOR_ORDER>(leds[1], NUM_LEDS).setCorrection(TypicalLEDStrip);
-  FastLED.addLeds<LED_TYPE,4,COLOR_ORDER>(leds[2], NUM_LEDS).setCorrection(TypicalLEDStrip);
-  FastLED.addLeds<LED_TYPE,15,COLOR_ORDER>(leds[3], NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<LED_TYPE,4,COLOR_ORDER>(leds[1], NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<LED_TYPE,33,COLOR_ORDER>(leds[2], NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<LED_TYPE,32,COLOR_ORDER>(leds[3], NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
-  for (int i = 2; i < NUMBER_OF_STATISTICS; i++) {
+  for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
     leds[i][0] = CRGB::Red;
     leds[i][1] = CRGB::Green;
     leds[i][2] = CRGB::Blue;
