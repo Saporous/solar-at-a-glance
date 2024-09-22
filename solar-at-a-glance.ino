@@ -105,19 +105,35 @@ void WiFiEvent(WiFiEvent_t event)
 {
   switch (event)
   {
-    case SYSTEM_EVENT_STA_GOT_IP:
+    case ARDUINO_EVENT_WIFI_READY:
+      Serial.println("WiFi ready");
+      break;
+
+    case ARDUINO_EVENT_WIFI_STA_START:
+      Serial.println("WiFi STA starting");
+      break;
+
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      Serial.println("WiFi STA connected");
+      break;
+
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP6:
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
       Serial.println("WiFi connected");
-      Serial.println("IP address: ");
+      Serial.print("IP address: ");
       Serial.println(WiFi.localIP());
       connectToMqtt();
       break;
 
-    case SYSTEM_EVENT_STA_DISCONNECTED:
+    case ARDUINO_EVENT_WIFI_STA_LOST_IP:
+      Serial.println("WiFi lost IP");
+      break;
+
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
       Serial.println("WiFi lost connection");
       xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
       xTimerStart(wifiReconnectTimer, 0);
       break;
-
     default:
       break;
   }
@@ -182,15 +198,15 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
 {
   (void) payload;
   payloadValue = 0;
-  Serial.println("Publish received.");
-  Serial.print("  topic: ");
-  Serial.println(topic);
-  Serial.print("  len: ");
-  Serial.println(len);
-  Serial.print("  index: ");
-  Serial.println(index);
-  Serial.print("  total: ");
-  Serial.println(total);
+  // Serial.println("Publish received.");
+  // Serial.print("  topic: ");
+  // Serial.println(topic);
+  // Serial.print("  len: ");
+  // Serial.println(len);
+  // Serial.print("  index: ");
+  // Serial.println(index);
+  // Serial.print("  total: ");
+  // Serial.println(total);
   int id;
   for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
     if (String(topic) == String(data[i].get_topic())) {
@@ -273,8 +289,7 @@ void loop() {
   currentMillis = millis();
   if (currentMillis - lastMillis > 2000) {
     lastMillis = currentMillis;
-    
-    currentStatistic++;
+
     if (currentStatistic >= NUMBER_OF_STATISTICS) currentStatistic = 0;
     
     // reset LEDs by setting them to black (off)
@@ -283,20 +298,18 @@ void loop() {
         leds[j][i] = CRGB::Black;
       }
     }
-    data[currentStatistic].print_all();
-    for (int i = 0; i < NUM_LEDS; i++) {
-      if (data[currentStatistic].get_percentage() * NUM_LEDS > i) {
-        for (int j = 0; j < NUMBER_OF_STATISTICS; j++) {
-          leds[j][i] = data[currentStatistic].get_color();
-          Serial.print("1");
+    // data[currentStatistic].print_all();
+    for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {  
+        for (int j = 0; j < NUM_LEDS; j++) {
+          if (data[i].get_percentage() * NUM_LEDS > j) {
+            leds[i][j] = data[i].get_color();
+          }
         }
-      }
-      Serial.print("0");
     }
-    Serial.println("------");
-    Serial.print(data[currentStatistic].get_name());
-    Serial.println(data[currentStatistic].get_percentage());
-    Serial.println("------");
+    // Serial.println("------");
+    // Serial.print(data[currentStatistic].get_name());
+    // Serial.println(data[currentStatistic].get_percentage());
+    // Serial.println("------");
 
     FastLED.show(); 
   }
