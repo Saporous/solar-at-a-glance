@@ -86,6 +86,16 @@ FASTLED_USING_NAMESPACE
 #define COLOR_ORDER GRB
 #define NUM_LEDS    11
 CRGB leds[NUMBER_OF_STATISTICS][NUM_LEDS];
+CRGB myPalette[8] = {
+  CRGB::Red,
+  CRGB::Cyan,
+  CRGB::Red,
+  CRGB::Yellow,
+  CRGB::LightGreen,
+  CRGB::Blue,
+  CRGB::Purple,
+  CRGB::DeepPink
+};
 
 #define BRIGHTNESS          2
 #define FRAMES_PER_SECOND  10
@@ -272,15 +282,16 @@ void setup()
   FastLED.addLeds<LED_TYPE,33,COLOR_ORDER>(leds[2], NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.addLeds<LED_TYPE,32,COLOR_ORDER>(leds[3], NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
+  int temp = 0;
   for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
-    leds[i][0] = CRGB::Red;
-    leds[i][1] = CRGB::Green;
-    leds[i][2] = CRGB::Blue;
-    leds[i][3] = CRGB::Red;
+    for (int j = 0; j < NUM_LEDS; j++) {
+      leds[i][j] = myPalette[temp%7];
+      temp++;
+    }
   }
   
   FastLED.show();  
-  delay(10000);
+  delay(5000);
   Serial.println("\nSetup end");
 }
 
