@@ -8,6 +8,7 @@ extern "C"
 #include "freertos/timers.h"
 }
 #include <AsyncMQTT_ESP32.h>
+#define FASTLED_INTERNAL //remove annoying pragma messages
 #include <FastLED.h>
 
 #define MQTT_HOST         "192.168.1.112"        // Broker address
@@ -63,7 +64,7 @@ class MQTT_data {
   }
 };
 
-int NUMBER_OF_STATISTICS = 4;
+#define NUMBER_OF_STATISTICS 4
 MQTT_data data[4] = {
   MQTT_data("solar_assistant/total/battery_state_of_charge/state", "Battery %", CRGB::Green, 100),
   MQTT_data("solar_assistant/total/pv_power/state", "Solar %", CRGB::Yellow, 6000),
@@ -81,14 +82,23 @@ int lastMillis, currentMillis;
 
 FASTLED_USING_NAMESPACE
 
-#define DATA_PIN    2
 #define LED_TYPE    WS2812B
 #define COLOR_ORDER GRB
 #define NUM_LEDS    11
-CRGB leds[NUM_LEDS];
+CRGB leds[NUMBER_OF_STATISTICS][NUM_LEDS];
+CRGB myPalette[8] = {
+  CRGB::Red,
+  CRGB::Cyan,
+  CRGB::Red,
+  CRGB::Yellow,
+  CRGB::LightGreen,
+  CRGB::Blue,
+  CRGB::Purple,
+  CRGB::DeepPink
+};
 
 #define BRIGHTNESS          2
-#define FRAMES_PER_SECOND  30
+#define FRAMES_PER_SECOND  10
 void connectToWifi()
 {
   Serial.println("Connecting to Wi-Fi...");
@@ -105,8 +115,6 @@ void WiFiEvent(WiFiEvent_t event)
 {
   switch (event)
   {
-#if USING_CORE_ESP32_CORE_V200_PLUS
-
     case ARDUINO_EVENT_WIFI_READY:
       Serial.println("WiFi ready");
       break;
@@ -136,22 +144,6 @@ void WiFiEvent(WiFiEvent_t event)
       xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
       xTimerStart(wifiReconnectTimer, 0);
       break;
-#else
-
-    case SYSTEM_EVENT_STA_GOT_IP:
-      Serial.println("WiFi connected");
-      Serial.println("IP address: ");
-      Serial.println(WiFi.localIP());
-      connectToMqtt();
-      break;
-
-    case SYSTEM_EVENT_STA_DISCONNECTED:
-      Serial.println("WiFi lost connection");
-      xTimerStop(mqttReconnectTimer, 0); // ensure we don't reconnect to MQTT while reconnecting to Wi-Fi
-      xTimerStart(wifiReconnectTimer, 0);
-      break;
-#endif
-
     default:
       break;
   }
@@ -216,15 +208,15 @@ void onMqttMessage(char* topic, char* payload, const AsyncMqttClientMessagePrope
 {
   (void) payload;
   payloadValue = 0;
-  Serial.println("Publish received.");
-  Serial.print("  topic: ");
-  Serial.println(topic);
-  Serial.print("  len: ");
-  Serial.println(len);
-  Serial.print("  index: ");
-  Serial.println(index);
-  Serial.print("  total: ");
-  Serial.println(total);
+  // Serial.println("Publish received.");
+  // Serial.print("  topic: ");
+  // Serial.println(topic);
+  // Serial.print("  len: ");
+  // Serial.println(len);
+  // Serial.print("  index: ");
+  // Serial.println(index);
+  // Serial.print("  total: ");
+  // Serial.println(total);
   int id;
   for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
     if (String(topic) == String(data[i].get_topic())) {
@@ -285,13 +277,21 @@ void setup()
 
   connectToWifi();
 
-  FastLED.addLeds<LED_TYPE,DATA_PIN,COLOR_ORDER>(leds, NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<LED_TYPE,2,COLOR_ORDER>(leds[0], NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<LED_TYPE,4,COLOR_ORDER>(leds[1], NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<LED_TYPE,33,COLOR_ORDER>(leds[2], NUM_LEDS).setCorrection(TypicalLEDStrip);
+  FastLED.addLeds<LED_TYPE,32,COLOR_ORDER>(leds[3], NUM_LEDS).setCorrection(TypicalLEDStrip);
   FastLED.setBrightness(BRIGHTNESS);
-  leds[0] = CRGB::Red;
-  leds[1] = CRGB::Green;
-  leds[2] = CRGB::Blue;
-  leds[3] = CRGB::Red;
+  int temp = 0;
+  for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {
+    for (int j = 0; j < NUM_LEDS; j++) {
+      leds[i][j] = myPalette[temp%7];
+      temp++;
+    }
+  }
+  
   FastLED.show();  
+  delay(5000);
   Serial.println("\nSetup end");
 }
 
@@ -300,26 +300,27 @@ void loop() {
   currentMillis = millis();
   if (currentMillis - lastMillis > 2000) {
     lastMillis = currentMillis;
-    
-    currentStatistic++;
+
     if (currentStatistic >= NUMBER_OF_STATISTICS) currentStatistic = 0;
     
     // reset LEDs by setting them to black (off)
     for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = CRGB::Black;
-    }
-    data[currentStatistic].print_all();
-    for (int i = 0; i < NUM_LEDS; i++) {
-      if (data[currentStatistic].get_percentage() * NUM_LEDS > i) {
-        leds[i] = data[currentStatistic].get_color();
-        Serial.print("1");
+      for (int j = 0; j < NUMBER_OF_STATISTICS; j++) {
+        leds[j][i] = CRGB::Black;
       }
-      Serial.print("0");
     }
-    Serial.println("------");
-    Serial.print(data[currentStatistic].get_name());
-    Serial.println(data[currentStatistic].get_percentage());
-    Serial.println("------");
+    // data[currentStatistic].print_all();
+    for (int i = 0; i < NUMBER_OF_STATISTICS; i++) {  
+        for (int j = 0; j < NUM_LEDS; j++) {
+          if (data[i].get_percentage() * NUM_LEDS > j) {
+            leds[i][j] = data[i].get_color();
+          }
+        }
+    }
+    // Serial.println("------");
+    // Serial.print(data[currentStatistic].get_name());
+    // Serial.println(data[currentStatistic].get_percentage());
+    // Serial.println("------");
 
     FastLED.show(); 
   }
